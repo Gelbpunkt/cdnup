@@ -39,7 +39,7 @@ async fn purge_cache(url: &str) {
     if !*ENABLE_CF {
         return;
     }
-    let mut req = hyper::Request::builder()
+    let mut req = Request::builder()
         .method("POST")
         .uri(format!(
             "https://api.cloudflare.com/client/v4/zones/{}/purge_cache",
