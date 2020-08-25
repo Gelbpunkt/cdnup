@@ -1,0 +1,5 @@
+/target
+cdn.db
+cdn.db-shm
+cdn.db-wal
+secret-notes.txt
