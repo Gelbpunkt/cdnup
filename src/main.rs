@@ -97,7 +97,7 @@ async fn upload_file(
         .await
         .unwrap();
     while let Some(chunk) = payload.next().await {
-        file.write(&chunk.expect("Error reading chunk"))
+        file.write_all(&chunk.expect("Error reading chunk"))
             .await
             .expect("Error writing to file");
     }
