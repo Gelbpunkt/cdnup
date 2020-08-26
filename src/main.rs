@@ -12,7 +12,7 @@ use futures::StreamExt;
 use hyper::{client::HttpConnector, Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use lazy_static::lazy_static;
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use sqlx::postgres::{PgPool, PgPoolOptions};
 use tokio::{
     fs::{remove_dir_all, rename, DirBuilder, File, OpenOptions},
     io::AsyncWriteExt,
@@ -65,11 +65,7 @@ fn parse_filename_from_uri(uri: &str) -> Option<String> {
 }
 
 #[post("*", wrap = "auth::RequiresAuth")]
-async fn upload_file(
-    req: HttpRequest,
-    mut payload: Payload,
-    pool: Data<SqlitePool>,
-) -> impl Responder {
+async fn upload_file(req: HttpRequest, mut payload: Payload, pool: Data<PgPool>) -> impl Responder {
     let file_name = match parse_filename_from_uri(&req.uri().to_string()) {
         Some(n) => n,
         None => return String::from("No valid path given"),
@@ -90,7 +86,7 @@ async fn upload_file(
         .await
         .expect("Error opening file");
     let display_path = format!("{}/{}", target_uuid, file_name);
-    sqlx::query(r#"INSERT INTO uploads ("file_path", "uploader") VALUES (?1, (SELECT "id" FROM users WHERE "key"=?2));"#)
+    sqlx::query(r#"INSERT INTO uploads ("file_path", "uploader") VALUES ($1, (SELECT "id" FROM users WHERE "key"=$2));"#)
         .bind(display_path.clone())
         .bind(req.headers().get("Authorization").unwrap().to_str().unwrap())
         .execute(&**pool)
@@ -127,12 +123,12 @@ async fn overwrite_file(req: HttpRequest, mut payload: Payload) -> impl Responde
 }
 
 #[delete("*", wrap = "auth::RequiresOwnership")]
-async fn delete_file(req: HttpRequest, pool: Data<SqlitePool>) -> impl Responder {
+async fn delete_file(req: HttpRequest, pool: Data<PgPool>) -> impl Responder {
     let target_path = &req.path()[1..];
     let mut base_path = PathBuf::new();
     base_path.push(UPLOAD_DIRECTORY.clone());
     base_path.push(target_path.split("/").next().unwrap());
-    sqlx::query(r#"DELETE FROM uploads WHERE "file_path"=?1;"#)
+    sqlx::query(r#"DELETE FROM uploads WHERE "file_path"=$1;"#)
         .bind(target_path)
         .execute(&**pool)
         .await
@@ -146,7 +142,7 @@ async fn delete_file(req: HttpRequest, pool: Data<SqlitePool>) -> impl Responder
 }
 
 #[patch("*", wrap = "auth::RequiresOwnership")]
-async fn move_file(req: HttpRequest, pool: Data<SqlitePool>) -> impl Responder {
+async fn move_file(req: HttpRequest, pool: Data<PgPool>) -> impl Responder {
     let rename_file_to = match req.headers().get("X-Rename-To") {
         Some(n) => n.to_str().unwrap(),
         None => return String::from("X-Rename-To not set"),
@@ -166,7 +162,7 @@ async fn move_file(req: HttpRequest, pool: Data<SqlitePool>) -> impl Responder {
     current_path.push(current_file_name);
     base_path.push(name.clone());
     let new_short = format!("{}/{}", uuid, name);
-    sqlx::query(r#"UPDATE uploads SET "file_path"=?1 WHERE "file_path"=?2;"#)
+    sqlx::query(r#"UPDATE uploads SET "file_path"=$1 WHERE "file_path"=$2;"#)
         .bind(new_short.clone())
         .bind(target_path)
         .execute(&**pool)
@@ -185,9 +181,9 @@ async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
 
-    let pool = SqlitePoolOptions::new()
+    let pool = PgPoolOptions::new()
         .max_connections(10)
-        .connect("sqlite:cdn.db")
+        .connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL not set"))
         .await
         .unwrap();
 

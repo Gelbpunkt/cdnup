@@ -565,6 +565,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-mac"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab"
+dependencies = [
+ "generic-array",
+ "subtle",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -876,6 +886,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
 
 [[package]]
+name = "hmac"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "126888268dcc288495a26bf004b38c5fdbb31682f992c84ceb046a1f0fe38840"
+dependencies = [
+ "crypto-mac",
+ "digest",
+]
+
+[[package]]
 name = "hostname"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1042,17 +1062,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "755456fae044e6fa1ebbbd1b3e902ae19e73097ed4ed87bb79934a867c007bc3"
 
 [[package]]
-name = "libsqlite3-sys"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e704a02bcaecd4a08b93a23f6be59d0bd79cd161e0963e9499165a0a35df7bd"
-dependencies = [
- "cc",
- "pkg-config",
- "vcpkg",
-]
-
-[[package]]
 name = "linked-hash-map"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1108,6 +1117,17 @@ name = "maybe-uninit"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
+
+[[package]]
+name = "md-5"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5a279bb9607f9f53c22d496eade00d138d1bdcccd07d74650387cf94942a15"
+dependencies = [
+ "block-buffer",
+ "digest",
+ "opaque-debug",
+]
 
 [[package]]
 name = "memchr"
@@ -1259,6 +1279,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77af24da69f9d9341038eba93a073b1fdaaa1b788221b00a69bce9e762cb32de"
 
 [[package]]
+name = "openssl-src"
+version = "111.10.2+1.1.1g"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a287fdb22e32b5b60624d4a5a7a02dbe82777f730ec0dbc42a0554326fef5a70"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "openssl-sys"
 version = "0.9.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1267,6 +1296,7 @@ dependencies = [
  "autocfg",
  "cc",
  "libc",
+ "openssl-src",
  "pkg-config",
  "vcpkg",
 ]
@@ -1605,6 +1635,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2579985fda508104f7587689507983eadd6a6e84dd35d6d115361f530916fa0d"
 
 [[package]]
+name = "sha2"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2933378ddfeda7ea26f48c555bdad8bb446bf8a3d17832dc83e380d444cfb8c1"
+dependencies = [
+ "block-buffer",
+ "cfg-if",
+ "cpuid-bool",
+ "digest",
+ "opaque-debug",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1666,6 +1709,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe2857d90b39b8528948109abc1b8d4c1905d184c87deaf06055f0b21050f13e"
 dependencies = [
  "atoi",
+ "base64",
  "bitflags",
  "byteorder",
  "bytes",
@@ -1678,15 +1722,19 @@ dependencies = [
  "futures-util",
  "hashbrown",
  "hex",
+ "hmac",
  "itoa",
  "libc",
- "libsqlite3-sys",
  "log",
  "lru-cache",
+ "md-5",
  "memchr",
  "once_cell",
  "parking_lot",
  "percent-encoding",
+ "rand",
+ "sha-1",
+ "sha2",
  "smallvec",
  "sqlformat",
  "sqlx-rt",
@@ -1795,6 +1843,12 @@ dependencies = [
  "unicode-bidi",
  "unicode-normalization",
 ]
+
+[[package]]
+name = "subtle"
+version = "2.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "502d53007c02d7605a05df1c1a73ee436952781653da5d0bf57ad608f66932c1"
 
 [[package]]
 name = "syn"

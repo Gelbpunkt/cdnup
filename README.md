@@ -4,14 +4,7 @@ CDN upload server for the Travitia CDN.
 
 ## Database
 
-This server uses SQLite due to being portable and having almost zero overhead.
-
-```sh
-cargo install --version=0.1.0-beta.1 sqlx-cli
-export DATABASE_URL="sqlite:cdn.db"
-sqlx db create
-sqlx migrate run
-```
+This server uses PostgreSQL due to it being installed on all our systems. `DATABASE_URL` env var should point to a URI.
 
 ## Note
 

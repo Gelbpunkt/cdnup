@@ -60,9 +60,9 @@ where
             let is_valid = match header {
                 Some(header_val) => match header_val.to_str() {
                     Ok(val) => {
-                        let pool = req.app_data::<Data<sqlx::SqlitePool>>().unwrap();
+                        let pool = req.app_data::<Data<sqlx::PgPool>>().unwrap();
                         let results: Option<(i32,)> =
-                            sqlx::query_as(r#"SELECT "id" FROM users WHERE "key"=?1;"#)
+                            sqlx::query_as(r#"SELECT "id" FROM users WHERE "key"=$1;"#)
                                 .bind(val)
                                 .fetch_optional(&***pool)
                                 .await
@@ -139,9 +139,9 @@ where
             let is_valid = match header {
                 Some(header_val) => match header_val.to_str() {
                     Ok(val) => {
-                        let pool = req.app_data::<Data<sqlx::SqlitePool>>().unwrap();
+                        let pool = req.app_data::<Data<sqlx::PgPool>>().unwrap();
                         let results: Option<(i32,)> =
-                            sqlx::query_as(r#"SELECT "id" FROM users INNER JOIN uploads ON uploads."uploader"=users."id" WHERE uploads."file_path"=?1 AND users."key"=?2;"#)
+                            sqlx::query_as(r#"SELECT "id" FROM users JOIN uploads ON uploads."uploader"=users."id" WHERE uploads."file_path"=$1 AND users."key"=$2;"#)
                                 .bind(request_path)
                                 .bind(val)
                                 .fetch_optional(&***pool)
