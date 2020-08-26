@@ -113,7 +113,7 @@ async fn overwrite_file(req: HttpRequest, mut payload: Payload) -> impl Responde
         .await
         .expect("Error opening file");
     while let Some(chunk) = payload.next().await {
-        file.write(&chunk.expect("Error reading chunk"))
+        file.write_all(&chunk.expect("Error reading chunk"))
             .await
             .expect("Error writing to file");
     }
