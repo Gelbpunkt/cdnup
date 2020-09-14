@@ -8,11 +8,16 @@ use actix_web::{
     web::{Data, Payload},
     App, HttpRequest, HttpServer, Responder,
 };
+use bb8_postgres::{
+    bb8::Pool,
+    tokio_postgres::{config::Config, NoTls},
+    PostgresConnectionManager,
+};
 use futures::StreamExt;
 use hyper::{client::HttpConnector, Body, Client, Request};
-use hyper_tls::HttpsConnector;
+use hyper_rustls::HttpsConnector;
 use lazy_static::lazy_static;
-use sqlx::postgres::{PgPool, PgPoolOptions};
+use std::str::FromStr;
 use tokio::{
     fs::{remove_dir_all, rename, DirBuilder, File, OpenOptions},
     io::AsyncWriteExt,
@@ -20,6 +25,8 @@ use tokio::{
 use uuid::Uuid;
 
 mod auth;
+
+type PgPool = Pool<PostgresConnectionManager<NoTls>>;
 
 lazy_static! {
     static ref CLIENT: Client<HttpsConnector<HttpConnector>, Body> = {
@@ -86,12 +93,14 @@ async fn upload_file(req: HttpRequest, mut payload: Payload, pool: Data<PgPool>)
         .await
         .expect("Error opening file");
     let display_path = format!("{}/{}", target_uuid, file_name);
-    sqlx::query(r#"INSERT INTO uploads ("file_path", "uploader") VALUES ($1, (SELECT "id" FROM users WHERE "key"=$2));"#)
-        .bind(display_path.clone())
-        .bind(req.headers().get("Authorization").unwrap().to_str().unwrap())
-        .execute(&**pool)
-        .await
-        .unwrap();
+    let conn = pool.get().await.unwrap();
+    conn.execute(
+        r#"INSERT INTO uploads ("file_path", "uploader") VALUES ($1, (SELECT "id" FROM users WHERE "key"=$2));"#,
+        &[
+            &display_path,
+            &req.headers().get("Authorization").unwrap().to_str().unwrap()
+        ]
+    ).await.unwrap();
     while let Some(chunk) = payload.next().await {
         file.write_all(&chunk.expect("Error reading chunk"))
             .await
@@ -128,11 +137,13 @@ async fn delete_file(req: HttpRequest, pool: Data<PgPool>) -> impl Responder {
     let mut base_path = PathBuf::new();
     base_path.push(UPLOAD_DIRECTORY.clone());
     base_path.push(target_path.split("/").next().unwrap());
-    sqlx::query(r#"DELETE FROM uploads WHERE "file_path"=$1;"#)
-        .bind(target_path)
-        .execute(&**pool)
-        .await
-        .unwrap();
+    let conn = pool.get().await.unwrap();
+    conn.execute(
+        r#"DELETE FROM uploads WHERE "file_path"=$1;"#,
+        &[&target_path],
+    )
+    .await
+    .unwrap();
     remove_dir_all(base_path)
         .await
         .expect("Failed to remove directory");
@@ -162,12 +173,13 @@ async fn move_file(req: HttpRequest, pool: Data<PgPool>) -> impl Responder {
     current_path.push(current_file_name);
     base_path.push(name.clone());
     let new_short = format!("{}/{}", uuid, name);
-    sqlx::query(r#"UPDATE uploads SET "file_path"=$1 WHERE "file_path"=$2;"#)
-        .bind(new_short.clone())
-        .bind(target_path)
-        .execute(&**pool)
-        .await
-        .unwrap();
+    let conn = pool.get().await.unwrap();
+    conn.execute(
+        r#"UPDATE uploads SET "file_path"=$1 WHERE "file_path"=$2;"#,
+        &[&new_short, &target_path],
+    )
+    .await
+    .unwrap();
     rename(current_path, base_path)
         .await
         .expect("Error renaming file");
@@ -181,11 +193,9 @@ async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
 
-    let pool = PgPoolOptions::new()
-        .max_connections(10)
-        .connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL not set"))
-        .await
-        .unwrap();
+    let config = Config::from_str(&std::env::var("DATABASE_URL").unwrap()).unwrap();
+    let manager = PostgresConnectionManager::new(config, NoTls);
+    let pool = Pool::builder().build(manager).await.unwrap();
 
     HttpServer::new(move || {
         App::new()

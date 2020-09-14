@@ -1,7 +1,7 @@
 # Mount rclone config as rclone.conf at /
 FROM docker.io/library/alpine:edge AS builder
 
-RUN apk add --no-cache curl gcc musl-dev perl make perl cmake && \
+RUN apk add --no-cache curl gcc musl-dev perl make perl cmake lld && \
     curl -sSf https://sh.rustup.rs | sh -s -- --profile minimal --default-toolchain nightly -y
 
 WORKDIR /build

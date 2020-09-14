@@ -5,8 +5,11 @@ use std::task::{Context, Poll};
 
 use actix_service::{Service, Transform};
 use actix_web::{dev::ServiceRequest, dev::ServiceResponse, web::Data, Error, HttpResponse};
+use bb8_postgres::{bb8::Pool, tokio_postgres::NoTls, PostgresConnectionManager};
 use futures::future::{ok, Ready};
 use futures::Future;
+
+type PgPool = Pool<PostgresConnectionManager<NoTls>>;
 
 pub struct RequiresAuth;
 
@@ -60,17 +63,13 @@ where
             let is_valid = match header {
                 Some(header_val) => match header_val.to_str() {
                     Ok(val) => {
-                        let pool = req.app_data::<Data<sqlx::PgPool>>().unwrap();
-                        let results: Option<(i32,)> =
-                            sqlx::query_as(r#"SELECT "id" FROM users WHERE "key"=$1;"#)
-                                .bind(val)
-                                .fetch_optional(&***pool)
-                                .await
-                                .unwrap();
-                        match results {
-                            Some(_) => true,
-                            None => false,
-                        }
+                        let pool = req.app_data::<Data<PgPool>>().unwrap();
+                        let conn = pool.get().await.unwrap();
+                        let results = conn
+                            .query(r#"SELECT "id" FROM users WHERE "key"=$1;"#, &[&val])
+                            .await
+                            .unwrap();
+                        results.is_empty()
                     }
                     Err(_) => false,
                 },
@@ -139,18 +138,13 @@ where
             let is_valid = match header {
                 Some(header_val) => match header_val.to_str() {
                     Ok(val) => {
-                        let pool = req.app_data::<Data<sqlx::PgPool>>().unwrap();
-                        let results: Option<(i32,)> =
-                            sqlx::query_as(r#"SELECT "id" FROM users JOIN uploads ON uploads."uploader"=users."id" WHERE uploads."file_path"=$1 AND users."key"=$2;"#)
-                                .bind(request_path)
-                                .bind(val)
-                                .fetch_optional(&***pool)
-                                .await
-                                .unwrap();
-                        match results {
-                            Some(_) => true,
-                            None => false,
-                        }
+                        let pool = req.app_data::<Data<PgPool>>().unwrap();
+                        let conn = pool.get().await.unwrap();
+                        let results =
+                            conn.query(
+                                r#"SELECT "id" FROM users JOIN uploads ON uploads."uploader"=users."id" WHERE uploads."file_path"=$1 AND users."key"=$2;"#,
+                                &[&request_path, &val]).await.unwrap();
+                        results.is_empty()
                     }
                     Err(_) => false,
                 },
