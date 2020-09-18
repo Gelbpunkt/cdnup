@@ -136,7 +136,7 @@ async fn delete_file(req: HttpRequest, pool: Data<PgPool>) -> impl Responder {
     let target_path = &req.path()[1..];
     let mut base_path = PathBuf::new();
     base_path.push(UPLOAD_DIRECTORY.clone());
-    base_path.push(target_path.split("/").next().unwrap());
+    base_path.push(target_path.split('/').next().unwrap());
     let conn = pool.get().await.unwrap();
     conn.execute(
         r#"DELETE FROM uploads WHERE "file_path"=$1;"#,
@@ -164,7 +164,7 @@ async fn move_file(req: HttpRequest, pool: Data<PgPool>) -> impl Responder {
     };
     let target_path = &req.path()[1..];
     let mut base_path = PathBuf::new();
-    let mut current_name_split = target_path.split("/");
+    let mut current_name_split = target_path.split('/');
     let uuid = current_name_split.next().unwrap();
     let current_file_name = current_name_split.next().unwrap();
     base_path.push(UPLOAD_DIRECTORY.clone());

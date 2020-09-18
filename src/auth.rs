@@ -69,7 +69,7 @@ where
                             .query(r#"SELECT "id" FROM users WHERE "key"=$1;"#, &[&val])
                             .await
                             .unwrap();
-                        results.is_empty()
+                        !results.is_empty()
                     }
                     Err(_) => false,
                 },
@@ -144,7 +144,7 @@ where
                             conn.query(
                                 r#"SELECT "id" FROM users JOIN uploads ON uploads."uploader"=users."id" WHERE uploads."file_path"=$1 AND users."key"=$2;"#,
                                 &[&request_path, &val]).await.unwrap();
-                        results.is_empty()
+                        !results.is_empty()
                     }
                     Err(_) => false,
                 },
