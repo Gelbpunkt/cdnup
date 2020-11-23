@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use actix_web::{
+    client::Client,
     delete,
     http::HeaderValue,
     middleware::Logger,
@@ -14,8 +15,6 @@ use bb8_postgres::{
     PostgresConnectionManager,
 };
 use futures::StreamExt;
-use hyper::{client::HttpConnector, Body, Client, Request};
-use hyper_rustls::HttpsConnector;
 use lazy_static::lazy_static;
 use std::str::FromStr;
 use tokio::{
@@ -29,10 +28,6 @@ mod auth;
 type PgPool = Pool<PostgresConnectionManager<NoTls>>;
 
 lazy_static! {
-    static ref CLIENT: Client<HttpsConnector<HttpConnector>, Body> = {
-        let https = HttpsConnector::new();
-        Client::builder().build::<_, Body>(https)
-    };
     static ref BASE_URL: String = std::env::var("BASE_URL").expect("BASE_URL not set");
     static ref UPLOAD_DIRECTORY: String =
         std::env::var("UPLOAD_DIRECTORY").expect("UPLOAD_DIRECTORY not set");
@@ -42,23 +37,21 @@ lazy_static! {
     static ref CF_KEY: String = std::env::var("CF_KEY").expect("CF_KEY not set");
 }
 
-async fn purge_cache(url: &str) {
+async fn purge_cache(client: Data<Client>, url: &str) {
     if !*ENABLE_CF {
         return;
     }
-    let mut req = Request::builder()
-        .method("POST")
-        .uri(format!(
+    let res = client
+        .post(format!(
             "https://api.cloudflare.com/client/v4/zones/{}/purge_cache",
             *CF_ID
         ))
-        .body(Body::from(format!("{{\"files\": [{:?}]}}", url)))
-        .unwrap();
-    let headers_mut = req.headers_mut();
-    headers_mut.insert("X-Auth-Email", HeaderValue::from_static(&*CF_EMAIL));
-    headers_mut.insert("X-Auth-Key", HeaderValue::from_static(&*CF_KEY));
-    headers_mut.insert("Content-Type", HeaderValue::from_static("application/json"));
-    let res = (*CLIENT).request(req).await.expect("Error requesting CF");
+        .header("X-Auth-Email", HeaderValue::from_static(&*CF_EMAIL))
+        .header("X-Auth-Key", HeaderValue::from_static(&*CF_KEY))
+        .header("Content-Type", HeaderValue::from_static("application/json"))
+        .send_body(format!("{{\"files\": [{:?}]}}", url))
+        .await
+        .expect("Error requesting CF");
     assert_eq!(res.status(), 200);
 }
 
@@ -110,7 +103,11 @@ async fn upload_file(req: HttpRequest, mut payload: Payload, pool: Data<PgPool>)
 }
 
 #[put("*", wrap = "auth::RequiresOwnership")]
-async fn overwrite_file(req: HttpRequest, mut payload: Payload) -> impl Responder {
+async fn overwrite_file(
+    req: HttpRequest,
+    mut payload: Payload,
+    client: Data<Client>,
+) -> impl Responder {
     let target_path = &req.path()[1..];
     let mut base_path = PathBuf::new();
     base_path.push(UPLOAD_DIRECTORY.clone());
@@ -127,12 +124,12 @@ async fn overwrite_file(req: HttpRequest, mut payload: Payload) -> impl Responde
             .expect("Error writing to file");
     }
     let target_url = format!("{}/{}", *BASE_URL, target_path);
-    purge_cache(&target_url).await;
+    purge_cache(client, &target_url).await;
     target_url
 }
 
 #[delete("*", wrap = "auth::RequiresOwnership")]
-async fn delete_file(req: HttpRequest, pool: Data<PgPool>) -> impl Responder {
+async fn delete_file(req: HttpRequest, pool: Data<PgPool>, client: Data<Client>) -> impl Responder {
     let target_path = &req.path()[1..];
     let mut base_path = PathBuf::new();
     base_path.push(UPLOAD_DIRECTORY.clone());
@@ -148,12 +145,12 @@ async fn delete_file(req: HttpRequest, pool: Data<PgPool>) -> impl Responder {
         .await
         .expect("Failed to remove directory");
     let target_url = format!("{}/{}", *BASE_URL, target_path);
-    purge_cache(&target_url).await;
+    purge_cache(client, &target_url).await;
     "OK"
 }
 
 #[patch("*", wrap = "auth::RequiresOwnership")]
-async fn move_file(req: HttpRequest, pool: Data<PgPool>) -> impl Responder {
+async fn move_file(req: HttpRequest, pool: Data<PgPool>, client: Data<Client>) -> impl Responder {
     let rename_file_to = match req.headers().get("X-Rename-To") {
         Some(n) => n.to_str().unwrap(),
         None => return String::from("X-Rename-To not set"),
@@ -184,7 +181,7 @@ async fn move_file(req: HttpRequest, pool: Data<PgPool>) -> impl Responder {
         .await
         .expect("Error renaming file");
     let old_url = format!("{}/{}", *BASE_URL, target_path);
-    purge_cache(&old_url).await;
+    purge_cache(client, &old_url).await;
     format!("{}/{}", *BASE_URL, new_short)
 }
 
@@ -198,9 +195,11 @@ async fn main() -> std::io::Result<()> {
     let pool = Pool::builder().build(manager).await.unwrap();
 
     HttpServer::new(move || {
+        let client = Client::new();
         App::new()
             .wrap(Logger::default())
             .data(pool.clone())
+            .data(client)
             .service(upload_file)
             .service(overwrite_file)
             .service(delete_file)

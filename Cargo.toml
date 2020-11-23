@@ -7,13 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actix-web = "3"
-env_logger = "0.7"
-bb8-postgres = "0.4"
+actix-web = { version = "3", default-features = false, features = ["rustls"] }
+env_logger = "0.8"
+bb8-postgres = "0.5"
 actix-service = "1.0"
-futures = "0.3"
-hyper = "0.13"
-hyper-rustls = "0.21"
 lazy_static = "1.4"
-tokio = { version = "0.2", features = ["fs"] }
+futures = { version = "0.3", default-features = false }
+tokio = { version = "0.2", default-features = false, features = ["fs"] }
 uuid = { version = "0.8", features = ["v4"] }
