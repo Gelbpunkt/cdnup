@@ -46,9 +46,9 @@ async fn purge_cache(client: Data<Client>, url: &str) {
             "https://api.cloudflare.com/client/v4/zones/{}/purge_cache",
             *CF_ID
         ))
-        .header("X-Auth-Email", HeaderValue::from_static(&*CF_EMAIL))
-        .header("X-Auth-Key", HeaderValue::from_static(&*CF_KEY))
-        .header("Content-Type", HeaderValue::from_static("application/json"))
+        .insert_header(("X-Auth-Email", HeaderValue::from_static(&*CF_EMAIL)))
+        .insert_header(("X-Auth-Key", HeaderValue::from_static(&*CF_KEY)))
+        .insert_header(("Content-Type", HeaderValue::from_static("application/json")))
         .send_body(format!("{{\"files\": [{:?}]}}", url))
         .await
         .expect("Error requesting CF");

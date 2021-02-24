@@ -16,13 +16,12 @@ pub struct RequiresAuth;
 // Middleware factory is `Transform` trait from actix-service crate
 // `S` - type of the next service
 // `B` - type of response's body
-impl<S: 'static, B> Transform<S> for RequiresAuth
+impl<S: 'static, B> Transform<S, ServiceRequest> for RequiresAuth
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
     S::Future: 'static,
     B: 'static,
 {
-    type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
     type InitError = ();
@@ -40,23 +39,22 @@ pub struct RequiresAuthMiddleware<S> {
     service: Rc<RefCell<S>>,
 }
 
-impl<S, B> Service for RequiresAuthMiddleware<S>
+impl<S, B> Service<ServiceRequest> for RequiresAuthMiddleware<S>
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
-    type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
 
-    fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        let mut svc = self.service.clone();
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        let svc = self.service.clone();
 
         Box::pin(async move {
             let header = req.headers().get("Authorization");
@@ -90,13 +88,12 @@ pub struct RequiresOwnership;
 // Middleware factory is `Transform` trait from actix-service crate
 // `S` - type of the next service
 // `B` - type of response's body
-impl<S: 'static, B> Transform<S> for RequiresOwnership
+impl<S: 'static, B> Transform<S, ServiceRequest> for RequiresOwnership
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
     S::Future: 'static,
     B: 'static,
 {
-    type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
     type InitError = ();
@@ -114,23 +111,22 @@ pub struct RequiresOwnershipMiddleware<S> {
     service: Rc<RefCell<S>>,
 }
 
-impl<S, B> Service for RequiresOwnershipMiddleware<S>
+impl<S, B> Service<ServiceRequest> for RequiresOwnershipMiddleware<S>
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
-    type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
 
-    fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        let mut svc = self.service.clone();
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        let svc = self.service.clone();
 
         Box::pin(async move {
             let header = req.headers().get("Authorization");
